@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 import crud
 import schemas
+import requests
 
 load_dotenv()
 
@@ -32,6 +33,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+eureka_server = "http://localhost:8761/eureka/apps/"
+app_name = "ml_backend"
+instance_id = f"{app_name}:{'localhost'}"
 
 #
 # class Context(BaseModel):
@@ -52,6 +56,37 @@ app.add_middleware(
 #         'device': context.device
 #     }
 #     return user_context
+
+
+def register_service():
+    instance_info = {
+        "instance": {
+            "instanceId": instance_id,
+            "hostName": "localhost",
+            "app": app_name.upper(),
+            "ipAddr": "127.0.0.1",
+            "vipAddress": app_name,
+            "secureVipAddress": app_name,
+            "statusPageUrl": "http://localhost:8000",
+            "port": {"$": 8000, "@enabled": "true"},
+            "dataCenterInfo": {
+                "@class": "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
+                "name": "MyOwn"
+            }
+        }
+    }
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(eureka_server + app_name, json=instance_info, headers=headers)
+    print(f"Registered with Eureka: {response.status_code}")
+
+@app.on_event("startup")
+def on_startup():
+    register_service()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from FastAPI service!"}
 
 @app.post("/activities/", response_model=schemas.Activity)
 def create_activity(activity: schemas.ActivityCreate):
@@ -144,3 +179,9 @@ def create_conversation(conversation: schemas.ConversationCreate):
 @app.get("/users/{user_id}/conversations/", response_model=List[schemas.Conversation])
 def get_user_conversations(user_id: int):
     return crud.get_user_conversations(user_id)
+
+
+#
+# curl -i -X POST http://localhost:8001/services/ --data name=fastapi-service --data url=http://localhost:8000
+#
+# curl -i -X POST http://localhost:8001/services/fastapi-service/routes --data 'paths[]=/fastapi'
