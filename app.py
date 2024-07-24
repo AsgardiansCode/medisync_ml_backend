@@ -1,6 +1,7 @@
 import os
 from typing import List
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -33,9 +34,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 eureka_server = "http://localhost:8761/eureka/apps/"
-app_name = "ml_backend"
+app_name = "ml-backend"
 instance_id = f"{app_name}:{'localhost'}"
+instance_port = 9001
 
 #
 # class Context(BaseModel):
@@ -67,8 +70,8 @@ def register_service():
             "ipAddr": "127.0.0.1",
             "vipAddress": app_name,
             "secureVipAddress": app_name,
-            "statusPageUrl": "http://localhost:8000",
-            "port": {"$": 8000, "@enabled": "true"},
+            "statusPageUrl": f"http://localhost:{instance_port}/status",
+            "port": {"$": instance_port, "@enabled": "true"},
             "dataCenterInfo": {
                 "@class": "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
                 "name": "MyOwn"
@@ -87,6 +90,11 @@ def on_startup():
 @app.get("/")
 def read_root():
     return {"message": "Hello from FastAPI service!"}
+
+@app.get("/test")
+def read_root():
+    return {"message": "testing success"}
+
 
 @app.post("/activities/", response_model=schemas.Activity)
 def create_activity(activity: schemas.ActivityCreate):
@@ -185,3 +193,6 @@ def get_user_conversations(user_id: int):
 # curl -i -X POST http://localhost:8001/services/ --data name=fastapi-service --data url=http://localhost:8000
 #
 # curl -i -X POST http://localhost:8001/services/fastapi-service/routes --data 'paths[]=/fastapi'
+
+# if __name__ == "__main__":
+#     uvicorn.run("app:app", port=instance_port, reload=True)
